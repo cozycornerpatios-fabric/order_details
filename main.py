@@ -10,16 +10,21 @@ KATANA_API_BASE = "https://api.katanamrp.com/v1"
 
 def fetch_order_by_number(order_number):
     headers = {"Authorization": f"Bearer {KATANA_API_TOKEN}"}
-    response = requests.get(f"{KATANA_API_BASE}/sales_orders?order_number={order_number}", headers=headers)
+    response = requests.get(f"{KATANA_API_BASE}/sales_orders", headers=headers)
 
     if response.status_code != 200:
         raise HTTPException(status_code=500, detail="Failed to fetch data from Katana")
-    
-    data = response.json()
-    if not data["results"]:
-        raise HTTPException(status_code=404, detail="Order not found")
-    
-    return data["results"][0]
+
+    orders = response.json().get("results", [])
+
+    # Manually find the correct order by order_number (e.g. "#43-19905-21")
+    matching_order = next((order for order in orders if order.get("order_number") == order_number), None)
+
+    if not matching_order:
+        raise HTTPException(status_code=404, detail="Order number not found")
+
+    return matching_order
+
 
 @app.get("/generate_excel")
 def generate_excel(order_number: str = Query(...)):
