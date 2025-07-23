@@ -5,7 +5,7 @@ import requests
 
 app = FastAPI()
 
-KATANA_API_TOKEN = "your_katana_api_key_here"
+KATANA_API_TOKEN = "e505d03b-c53f-4519-9d6a-69c7637b0f64"
 KATANA_API_BASE = "https://api.katanamrp.com/v1"
 
 def fetch_order_by_number(order_number):
