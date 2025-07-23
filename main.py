@@ -7,7 +7,7 @@ import urllib.parse
 app = FastAPI()
 
 # Replace with your real Katana API token
-KATANA_API_TOKEN = "c4559b18-a847-42e5-93fe-c1ac567f8d7e"
+KATANA_API_TOKEN = "f6db7848-c6aa-47e9-8595-f07a402220e4"
 KATANA_API_BASE = "https://api.katanamrp.com/v1"
 
 @app.get("/")
