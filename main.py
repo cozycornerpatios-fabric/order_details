@@ -32,7 +32,7 @@ def fetch_order_by_number(order_number: str):
 
     return matching_order
 
-@app.get("/generate_excel")
+@app.post("/generate_excel")
 def generate_excel(order_number: str = Query(...)):
     order = fetch_order_by_number(order_number)
 
