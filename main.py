@@ -6,18 +6,20 @@ import urllib.parse
 
 app = FastAPI()
 
-KATANA_API_TOKEN = "e505d03b-c53f-4519-9d6a-69c7637b0f64"
+# Replace this with your actual Katana API key
+KATANA_API_TOKEN = "c4559b18-a847-42e5-93fe-c1ac567f8d7e"
 KATANA_API_BASE = "https://api.katanamrp.com/v1"
 
 @app.get("/")
 def root():
     return {
-        "message": "Katana Excel Export API is running. Use /generate_excel?order_number=YOUR_ORDER_NUMBER"
+        "message": "✅ Katana Excel Export API is running. Use /generate_excel?order_number=YOUR_ORDER_NUMBER"
     }
 
-def fetch_order_by_number(order_number):
+def fetch_order_by_number(order_number: str):
     headers = {"Authorization": f"Bearer {KATANA_API_TOKEN}"}
-    response = requests.get(f"{KATANA_API_BASE}/sales_orders", headers=headers)
+    url = f"{KATANA_API_BASE}/sales_orders"
+    response = requests.get(url, headers=headers)
 
     if response.status_code != 200:
         raise HTTPException(status_code=500, detail="Failed to fetch data from Katana")
@@ -26,7 +28,7 @@ def fetch_order_by_number(order_number):
     matching_order = next((order for order in orders if order.get("order_number") == order_number), None)
 
     if not matching_order:
-        raise HTTPException(status_code=404, detail="Order number not found")
+        raise HTTPException(status_code=404, detail="Order not found")
 
     return matching_order
 
@@ -34,42 +36,33 @@ def fetch_order_by_number(order_number):
 def generate_excel(order_number: str = Query(...)):
     order = fetch_order_by_number(order_number)
 
-    # Protect against missing product or order_lines
-    product_name = ""
-    hs_code = ""
-    if order.get("order_lines"):
-        first_line = order["order_lines"][0]
-        product = first_line.get("product", {})
-        product_name = product.get("name", "")
-        hs_code = product.get("hs_code", "")
+    # Extract product info safely
+    product_names = []
+    skus = []
+    total_qty = 0
 
-    df = pd.DataFrame(columns=[ ... ])  # keep your column list
+    for line in order.get("order_lines", []):
+        product = line.get("product", {})
+        product_names.append(product.get("name", ""))
+        skus.append(product.get("sku", ""))
+        total_qty += line.get("quantity", 0)
 
-    df.loc[0] = [
-        1,
-        order.get("customer_name", ""),
-        order.get("customer_company", ""),
-        order.get("shipping_address_line1", ""),
-        "", "",  # Address Line 2/3
-        order.get("shipping_country", ""),
-        order.get("shipping_city", ""),
-        order.get("shipping_state", ""),
-        order.get("shipping_postal_code", ""),
-        order.get("customer_phone", ""),
-        "", "",  # Phone ext, Tax number
-        order.get("customer_email", ""),
-        "", "", "", "",  # Reference, billing
-        order["order_number"],
-        order["created_date"],
-        len(order["order_lines"]),
-        sum(line["quantity"] for line in order["order_lines"]),
-        "", "", "", "", "", "", "", "",
-        order["total_price"],
-        "", "", "", "",
-        product_name,
-        hs_code,
-        "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""
-    ]
+    df = pd.DataFrame([{
+        "Order Number": order.get("order_number", ""),
+        "Customer Name": order.get("customer_name", ""),
+        "Email": order.get("customer_email", ""),
+        "Shipping Address Line 1": order.get("shipping_address_line1", ""),
+        "Shipping State": order.get("shipping_state", ""),
+        "Shipping ZIP": order.get("shipping_postal_code", ""),
+        "Shipping Country": order.get("shipping_country", ""),
+        "Phone": order.get("customer_phone", ""),
+        "No. of Items": len(order.get("order_lines", [])),
+        "Total Quantity": total_qty,
+        "Product Names": ", ".join(product_names),
+        "SKUs": ", ".join(skus),
+        "Invoice Value": order.get("total_price", ""),
+        "Fulfillment Status": order.get("fulfillment_status", ""),
+    }])
 
     safe_order_number = urllib.parse.quote(order_number)
     file_path = f"/tmp/order_{safe_order_number}.xlsx"
