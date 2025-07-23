@@ -6,7 +6,7 @@ import urllib.parse
 
 app = FastAPI()
 
-# Replace this with your actual Katana API key
+# Replace with your real Katana API token
 KATANA_API_TOKEN = "c4559b18-a847-42e5-93fe-c1ac567f8d7e"
 KATANA_API_BASE = "https://api.katanamrp.com/v1"
 
@@ -36,7 +36,7 @@ def fetch_order_by_number(order_number: str):
 def generate_excel(order_number: str = Query(...)):
     order = fetch_order_by_number(order_number)
 
-    # Extract product info safely
+    # Extract product info
     product_names = []
     skus = []
     total_qty = 0
@@ -69,3 +69,4 @@ def generate_excel(order_number: str = Query(...)):
     df.to_excel(file_path, index=False)
 
     return FileResponse(file_path, filename=f"Customs_Template_{order_number}.xlsx")
+
