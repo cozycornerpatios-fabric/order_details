@@ -7,21 +7,21 @@ import os
 
 app = FastAPI()
 
-# === Katana API Credentials and Endpoints ===
-KATANA_API_TOKEN = "4103d451-7217-42fa-9cca-0f8a9e70155e"
+# === Katana API Configuration ===
+KATANA_API_TOKEN = "4103d451-7217-42fa-9cca-0f8a9e70155e"  # Replace with your actual token
 KATANA_API_BASE = "https://api.katanamrp.com/v1"
 KATANA_SALES_ORDERS_URL = f"{KATANA_API_BASE}/sales_orders"
-KATANA_CUSTOMERS_URL = f"{KATANA_API_BASE}/customers"
 
 @app.get("/")
 def root():
     return {
-        "message": "✅ Katana Excel Export API is running. Use /generate_excel?order_number=...&customer_reference=..."
+        "message": "✅ Katana Sales Order Excel API is live. Use POST /generate_excel?order_number=..."
     }
 
 def fetch_order_by_number(order_number: str):
     headers = {"Authorization": f"Bearer {KATANA_API_TOKEN}"}
     response = requests.get(KATANA_SALES_ORDERS_URL, headers=headers)
+
     if response.status_code != 200:
         raise HTTPException(status_code=500, detail="Failed to fetch sales orders from Katana")
 
@@ -29,34 +29,13 @@ def fetch_order_by_number(order_number: str):
     matching_order = next((order for order in orders if order.get("order_number") == order_number), None)
 
     if not matching_order:
-        raise HTTPException(status_code=404, detail="Order not found")
+        raise HTTPException(status_code=404, detail="Sales order not found")
 
-    print(f"✔️ Found order: {order_number}")
     return matching_order
 
-def fetch_customer_by_reference(reference_number: str):
-    headers = {"Authorization": f"Bearer {KATANA_API_TOKEN}"}
-    response = requests.get(KATANA_CUSTOMERS_URL, headers=headers)
-    if response.status_code != 200:
-        raise HTTPException(status_code=500, detail="Failed to fetch customers from Katana")
-
-    customers = response.json().get("results", [])
-    matching_customer = next(
-        (cust for cust in customers if cust.get("reference") == reference_number), None)
-
-    if not matching_customer:
-        raise HTTPException(status_code=404, detail="Customer not found")
-
-    print(f"✔️ Found customer reference: {reference_number}")
-    return matching_customer
-
 @app.post("/generate_excel")
-def generate_excel(
-    order_number: str = Query(...),
-    customer_reference: str = Query(...)
-):
+def generate_excel(order_number: str = Query(...)):
     order = fetch_order_by_number(order_number)
-    customer = fetch_customer_by_reference(customer_reference)
 
     product_names = []
     skus = []
@@ -70,13 +49,13 @@ def generate_excel(
 
     df = pd.DataFrame([{
         "Order Number": order.get("order_number", ""),
-        "Customer Name": customer.get("name", ""),
-        "Email": customer.get("email", ""),
-        "Shipping Address Line 1": order.get("shipping_address_line1", ""),
+        "Customer Name": order.get("customer_name", ""),
+        "Email": order.get("customer_email", ""),
+        "Phone": order.get("customer_phone", ""),
+        "Shipping Address": order.get("shipping_address_line1", ""),
         "Shipping State": order.get("shipping_state", ""),
         "Shipping ZIP": order.get("shipping_postal_code", ""),
         "Shipping Country": order.get("shipping_country", ""),
-        "Phone": customer.get("phone", ""),
         "No. of Items": len(order.get("order_lines", [])),
         "Total Quantity": total_qty,
         "Product Names": ", ".join(product_names),
@@ -90,7 +69,7 @@ def generate_excel(
     df.to_excel(file_path, index=False)
 
     return FileResponse(
-        file_path,
-        filename=f"Customs_Template_{order_number}.xlsx",
+        path=file_path,
+        filename=f"SalesOrder_{order_number}.xlsx",
         media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
     )
