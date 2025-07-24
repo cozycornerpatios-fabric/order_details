@@ -3,12 +3,15 @@ from fastapi.responses import FileResponse
 import pandas as pd
 import requests
 import urllib.parse
+import os
 
 app = FastAPI()
 
-# ✅ Your Katana API Key
+# === Katana API Credentials and Endpoints ===
 KATANA_API_TOKEN = "4103d451-7217-42fa-9cca-0f8a9e70155e"
 KATANA_API_BASE = "https://api.katanamrp.com/v1"
+KATANA_SALES_ORDERS_URL = f"{KATANA_API_BASE}/sales_orders"      # <-- Sales Orders endpoint
+KATANA_CUSTOMERS_URL = f"{KATANA_API_BASE}/customers"            # <-- Customers endpoint
 
 @app.get("/")
 def root():
@@ -18,9 +21,8 @@ def root():
 
 def fetch_order_by_number(order_number: str):
     headers = {"Authorization": f"Bearer {KATANA_API_TOKEN}"}
-    url = f"{KATANA_API_BASE}/sales_orders"
+    url = KATANA_SALES_ORDERS_URL
     response = requests.get(url, headers=headers)
-
     if response.status_code != 200:
         raise HTTPException(status_code=500, detail="Failed to fetch data from Katana")
 
@@ -32,7 +34,7 @@ def fetch_order_by_number(order_number: str):
 
     return matching_order
 
-@app.post("/generate_excel")
+@app.get("/generate_excel")
 def generate_excel(order_number: str = Query(...)):
     order = fetch_order_by_number(order_number)
 
@@ -67,4 +69,8 @@ def generate_excel(order_number: str = Query(...)):
     file_path = f"/tmp/order_{safe_order_number}.xlsx"
     df.to_excel(file_path, index=False)
 
-    return FileResponse(file_path, filename=f"Customs_Template_{order_number}.xlsx")
+    return FileResponse(
+        file_path,
+        filename=f"Customs_Template_{order_number}.xlsx",
+        media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )
