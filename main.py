@@ -3,73 +3,67 @@ from fastapi.responses import FileResponse
 import pandas as pd
 import requests
 import urllib.parse
-import os
+from typing import List
 
 app = FastAPI()
 
-# === Katana API Configuration ===
-KATANA_API_TOKEN = "4103d451-7217-42fa-9cca-0f8a9e70155e"  # Replace with your actual token
+KATANA_API_TOKEN = "4103d451-7217-42fa-9cca-0f8a9e70155e"
 KATANA_API_BASE = "https://api.katanamrp.com/v1"
 KATANA_SALES_ORDERS_URL = f"{KATANA_API_BASE}/sales_orders"
 
-@app.get("/")
-def root():
-    return {
-        "message": "✅ Katana Sales Order Excel API is live. Use POST /generate_excel?order_number=..."
-    }
-
-def fetch_order_by_number(order_number: str):
+def fetch_all_sales_orders():
     headers = {"Authorization": f"Bearer {KATANA_API_TOKEN}"}
-    response = requests.get(KATANA_SALES_ORDERS_URL, headers=headers)
-
-    if response.status_code != 200:
-        raise HTTPException(status_code=500, detail="Failed to fetch sales orders from Katana")
-
-    orders = response.json().get("results", [])
-    matching_order = next((order for order in orders if order.get("order_number") == order_number), None)
-
-    if not matching_order:
-        raise HTTPException(status_code=404, detail="Sales order not found")
-
-    return matching_order
+    results = []
+    url = KATANA_SALES_ORDERS_URL
+    while url:
+        response = requests.get(url, headers=headers)
+        if response.status_code != 200:
+            raise HTTPException(status_code=500, detail="Failed to fetch sales orders from Katana")
+        data = response.json()
+        results.extend(data.get("results", []))
+        url = data.get("next")
+    return results
 
 @app.post("/generate_excel")
-def generate_excel(order_number: str = Query(...)):
-    order = fetch_order_by_number(order_number)
+def generate_excel(order_numbers: List[str] = Query(...)):
+    all_orders = fetch_all_sales_orders()
+    selected_orders = [order for order in all_orders if order.get("order_number") in order_numbers]
+    if not selected_orders:
+        raise HTTPException(status_code=404, detail="No matching sales orders found")
 
-    product_names = []
-    skus = []
-    total_qty = 0
+    records = []
+    for order in selected_orders:
+        shipping = order.get("shipping_address", {})
+        records.append({
+            "Recipient_Contact Name": order.get("customer_name", ""),
+            "Recipient_Company Name": shipping.get("company_name", ""),
+            "Recipient_Address Line 1": shipping.get("address_line1", ""),
+            "Recipient_Address Line 2": shipping.get("address_line2", ""),
+            "Recipient_Address Line 3": shipping.get("address_line3", ""),
+            "Recipient_Country": shipping.get("country", ""),
+            "Recipient_City": shipping.get("city", ""),
+            "Recipient_State": shipping.get("state", ""),
+            "Recipient_Postal code": shipping.get("postal_code", ""),
+            "Recipient_Phone Number": shipping.get("phone", ""),
+            "Recipient_Email": order.get("customer_email", ""),
+            "Reference_1": order.get("order_number", ""),
+            "Invoice Value": order.get("total_price", ""),
+        })
 
-    for line in order.get("order_lines", []):
-        product = line.get("product", {})
-        product_names.append(product.get("name", ""))
-        skus.append(product.get("sku", ""))
-        total_qty += line.get("quantity", 0)
-
-    df = pd.DataFrame([{
-        "Order Number": order.get("order_number", ""),
-        "Customer Name": order.get("customer_name", ""),
-        "Email": order.get("customer_email", ""),
-        "Phone": order.get("customer_phone", ""),
-        "Shipping Address": order.get("shipping_address_line1", ""),
-        "Shipping State": order.get("shipping_state", ""),
-        "Shipping ZIP": order.get("shipping_postal_code", ""),
-        "Shipping Country": order.get("shipping_country", ""),
-        "No. of Items": len(order.get("order_lines", [])),
-        "Total Quantity": total_qty,
-        "Product Names": ", ".join(product_names),
-        "SKUs": ", ".join(skus),
-        "Invoice Value": order.get("total_price", ""),
-        "Fulfillment Status": order.get("fulfillment_status", "")
-    }])
-
-    safe_order_number = urllib.parse.quote(order_number)
-    file_path = f"/tmp/order_{safe_order_number}.xlsx"
+    columns = [
+        "Recipient_Contact Name", "Recipient_Company Name", "Recipient_Address Line 1",
+        "Recipient_Address Line 2", "Recipient_Address Line 3", "Recipient_Country",
+        "Recipient_City", "Recipient_State", "Recipient_Postal code", "Recipient_Phone Number",
+        "Recipient_Email", "Reference_1", "Invoice Value"
+    ]
+    df = pd.DataFrame(records, columns=columns)
+    safe_names = "_".join([urllib.parse.quote(num) for num in order_numbers])
+    file_path = f"/tmp/orders_{safe_names}.xlsx"
     df.to_excel(file_path, index=False)
 
     return FileResponse(
         path=file_path,
-        filename=f"SalesOrder_{order_number}.xlsx",
+        filename=f"SalesOrders_{safe_names}.xlsx",
         media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
     )
+
