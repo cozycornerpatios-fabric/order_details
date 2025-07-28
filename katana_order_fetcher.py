@@ -5,7 +5,7 @@ import pandas as pd
 
 # === CONFIGURATION ===
 API_TOKEN = '1e2c6dd2-c8ed-490d-8c70-a4bb21152682'  # Replace with your actual API token
-USER_TEMPLATE_PATH = 'user_template.xlsx'  # Excel template with desired format
+USER_TEMPLATE_PATH = 'fedex format (1).xlsx'  # Excel template with desired format
 OUTPUT_FILE = 'formatted_sales_orders.xlsx'
 
 BASE_URL = 'https://api.katanamrp.com/v1'
