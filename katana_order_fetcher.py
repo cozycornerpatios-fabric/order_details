@@ -39,23 +39,25 @@ def fetch_all_sales_orders():
 
 # === FILTER ORDERS BY REFERENCE ID ===
 def filter_orders(all_orders, order_numbers):
-    return [order for order in all_orders if order['reference'] in order_numbers]
+    return [order for order in all_orders if order['SO #'] in order_numbers]
 
 # === MAP TO TEMPLATE FORMAT ===
 def map_to_template(filtered_orders, template_path):
     user_template = pd.read_excel(template_path)
     column_mapping = {
-        '#SO': 'reference',
-        'Customer Name': 'customer_name',
-        'Customer Email': 'customer_email',
-        'Order Date': 'created_date',
-        'Delivery Date': 'delivery_date',
-        'Item Name': 'order_lines.name',
-        'Quantity': 'order_lines.quantity',
-        'Variant Code': 'order_lines.variant_code',
-        'Warehouse': 'warehouse_name',
-        'Tracking Number': 'tracking_number',
-        'Shipping Carrier': 'shipping_carrier'
+        'SO #': 'Reference_1',
+        'Customer': 'Recipient_Company Name',
+        'Customer': 'Recipient_Contact Name',
+        'Customer Email': 'Recipient_Email',
+        'Ship to address line 1':'Recipient_Address Line 1',
+        'Ship to address line 2':'Recipient_Address Line 2',
+        'Ship to phone number': 'Recipient_Phone Number',
+        'Ship to country':'Recipient_Country',
+        'Ship to city':'Recipient_City',
+        'Ship to state':'Recipient_State',
+        'Ship to zip code':'Recipient_Postal code',
+        'Order Date': 'Invoice Date',
+        'Quantity': 'Total No of Package'
     }
 
     output_data = pd.DataFrame(columns=user_template.columns)
