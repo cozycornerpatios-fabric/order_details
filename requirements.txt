@@ -1,5 +1,5 @@
-fastapi
-uvicorn
+Flask
+gunicorn
 pandas
-openpyxl
 requests
+openpyxl
