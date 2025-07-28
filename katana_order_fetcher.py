@@ -5,8 +5,8 @@ import pandas as pd
 import traceback
 
 # === CONFIGURATION ===
-API_TOKEN = '1e2c6dd2-c8ed-490d-8c70-a4bb21152682'  # Replace with your actual API token
-USER_TEMPLATE_PATH = 'format.xls'  # Excel template with desired format
+API_TOKEN = '1e2c6dd2-c8ed-490d-8c70-a4bb21152682'
+USER_TEMPLATE_PATH = 'format.xls'
 OUTPUT_FILE = 'formatted_sales_orders.xlsx'
 
 BASE_URL = 'https://api.katanamrp.com/v1'
@@ -15,63 +15,80 @@ HEADERS = {
     'Content-Type': 'application/json'
 }
 
-# === FUNCTION TO FETCH ALL SALES ORDERS ===
+# === FETCH ALL SALES ORDERS ===
 def fetch_all_sales_orders():
     orders = []
     endpoint = f'{BASE_URL}/sales_orders'
     page = 1
-
     while True:
         params = {'page_size': 100, 'page': page}
         response = requests.get(endpoint, headers=HEADERS, params=params)
-
         if response.status_code != 200:
             raise Exception(f"Error {response.status_code}: {response.text}")
-
         data = response.json().get('results', [])
         if not data:
             break
-
         orders.extend(data)
         page += 1
-
     return orders
 
-# === FILTER ORDERS BY REFERENCE ID ===
+# === FETCH CUSTOMER DETAILS ===
+def fetch_customer(customer_id):
+    url = f'{BASE_URL}/customers/{customer_id}'
+    response = requests.get(url, headers=HEADERS)
+    if response.status_code == 200:
+        return response.json()
+    return {}
+
+# === GET SHIPPING ADDRESS ===
+def get_shipping_address(addresses, shipping_id):
+    for addr in addresses:
+        if addr['id'] == shipping_id and addr['entity_type'] == 'shipping':
+            return addr
+    return {}
+
+# === FILTER ORDERS BY ORDER NUMBER ===
 def filter_orders(all_orders, order_numbers):
-    return [order for order in all_orders if order['SO #'] in order_numbers]
+    return [order for order in all_orders if order['order_no'] in order_numbers]
 
 # === MAP TO TEMPLATE FORMAT ===
 def map_to_template(filtered_orders, template_path):
     user_template = pd.read_excel(template_path)
-    column_mapping = {
-        'SO #': 'Reference_1',
-        'Customer': 'Recipient_Company Name',
-        'Customer': 'Recipient_Contact Name',
-        'Customer Email': 'Recipient_Email',
-        'Ship to address line 1':'Recipient_Address Line 1',
-        'Ship to address line 2':'Recipient_Address Line 2',
-        'Ship to phone number': 'Recipient_Phone Number',
-        'Ship to country':'Recipient_Country',
-        'Ship to city':'Recipient_City',
-        'Ship to state':'Recipient_State',
-        'Ship to zip code':'Recipient_Postal code',
-        'Order Date': 'Invoice Date',
-        'Quantity': 'Total No of Package'
-    }
-
     output_data = pd.DataFrame(columns=user_template.columns)
 
     for order in filtered_orders:
+        customer = fetch_customer(order['customer_id'])
+        shipping = get_shipping_address(order.get('addresses', []), order.get('shipping_address_id'))
+        line = order.get('sales_order_rows', [{}])[0]
+        
         row = {}
         for col in user_template.columns:
-            if col in column_mapping:
-                katana_col = column_mapping[col]
-                if '.' in katana_col and 'order_lines' in order and order['order_lines']:
-                    line = order['order_lines'][0]
-                    row[col] = line.get(katana_col.split('.')[-1], '')
-                else:
-                    row[col] = order.get(katana_col, '')
+            if col == 'Reference_1':
+                row[col] = order.get('order_no', '')
+            elif col == 'Recipient_Company Name':
+                row[col] = customer.get('company_name', '')
+            elif col == 'Recipient_Contact Name':
+                row[col] = customer.get('full_name', '')
+            elif col == 'Recipient_Email':
+                row[col] = customer.get('email', '')
+            elif col == 'Recipient_Address Line 1':
+                row[col] = shipping.get('line_1', '')
+            elif col == 'Recipient_Address Line 2':
+                row[col] = shipping.get('line_2', '')
+            elif col == 'Recipient_Phone Number':
+                row[col] = shipping.get('phone', '')
+            elif col == 'Recipient_Country':
+                row[col] = shipping.get('country', '')
+            elif col == 'Recipient_City':
+                row[col] = shipping.get('city', '')
+            elif col == 'Recipient_State':
+                row[col] = shipping.get('state', '')
+            elif col == 'Recipient_Postal code':
+                row[col] = shipping.get('zip', '')
+            elif col == 'Invoice Date':
+                row[col] = order.get('order_created_date', '')
+            elif col == 'Total No of Package':
+                row[col] = line.get('quantity', '')
             else:
                 row[col] = ''
         output_data = output_data.append(row, ignore_index=True)
@@ -88,9 +105,8 @@ if __name__ == '__main__':
     try:
         if len(sys.argv) < 2:
             raise ValueError("No Order IDs provided")
-
         try:
-            order_numbers = json.loads(sys.argv[1])  # Expecting a JSON array
+            order_numbers = json.loads(sys.argv[1])
         except json.JSONDecodeError:
             raise ValueError("Invalid input format: not valid JSON")
 
