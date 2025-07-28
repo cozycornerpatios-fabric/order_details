@@ -5,3 +5,5 @@ requests
 openpyxl
 uvicorn
 fastapi
+xlrd>=2.0.1
+
