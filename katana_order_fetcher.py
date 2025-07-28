@@ -2,6 +2,7 @@ import sys
 import json
 import requests
 import pandas as pd
+import traceback
 
 # === CONFIGURATION ===
 API_TOKEN = '1e2c6dd2-c8ed-490d-8c70-a4bb21152682'  # Replace with your actual API token
@@ -25,8 +26,7 @@ def fetch_all_sales_orders():
         response = requests.get(endpoint, headers=HEADERS, params=params)
 
         if response.status_code != 200:
-            print(f"Error {response.status_code}: {response.text}")
-            break
+            raise Exception(f"Error {response.status_code}: {response.text}")
 
         data = response.json().get('results', [])
         if not data:
@@ -83,17 +83,23 @@ def export_to_excel(df, output_file):
 
 # === MAIN EXECUTION ===
 if __name__ == '__main__':
-    if len(sys.argv) < 2:
-        print(json.dumps({"status": "error", "message": "No Order IDs provided"}))
-        sys.exit(1)
-
     try:
-        order_numbers = json.loads(sys.argv[1])  # Expecting a JSON array
-    except Exception as e:
-        print(json.dumps({"status": "error", "message": "Invalid input format"}))
-        sys.exit(1)
+        if len(sys.argv) < 2:
+            raise ValueError("No Order IDs provided")
 
-    all_orders = fetch_all_sales_orders()
-    filtered_orders = filter_orders(all_orders, order_numbers)
-    formatted_data = map_to_template(filtered_orders, USER_TEMPLATE_PATH)
-    export_to_excel(formatted_data, OUTPUT_FILE)
+        try:
+            order_numbers = json.loads(sys.argv[1])  # Expecting a JSON array
+        except json.JSONDecodeError:
+            raise ValueError("Invalid input format: not valid JSON")
+
+        all_orders = fetch_all_sales_orders()
+        filtered_orders = filter_orders(all_orders, order_numbers)
+        formatted_data = map_to_template(filtered_orders, USER_TEMPLATE_PATH)
+        export_to_excel(formatted_data, OUTPUT_FILE)
+
+    except Exception as e:
+        print(json.dumps({
+            "status": "error",
+            "message": str(e),
+            "details": traceback.format_exc()
+        }))
