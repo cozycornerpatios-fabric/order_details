@@ -1,13 +1,16 @@
 from fastapi import FastAPI, HTTPException, Query
-from fastapi.responses import FileResponse
+from fastapi.responses import StreamingResponse
 import pandas as pd
 import requests
+from io import BytesIO
 import urllib.parse
+import os
 from typing import List
 
 app = FastAPI()
 
-KATANA_API_TOKEN = "4103d451-7217-42fa-9cca-0f8a9e70155e"
+# Use env variable for security; fallback for local/dev only
+KATANA_API_TOKEN = os.environ.get("KATANA_API_TOKEN", "4103d451-7217-42fa-9cca-0f8a9e70155e")
 KATANA_API_BASE = "https://api.katanamrp.com/v1"
 KATANA_SALES_ORDERS_URL = f"{KATANA_API_BASE}/sales_orders"
 
@@ -33,7 +36,7 @@ def generate_excel(order_numbers: List[str] = Query(...)):
 
     records = []
     for order in selected_orders:
-        shipping = order.get("shipping_address", {})
+        shipping = order.get("shipping_address", {}) or {}
         records.append({
             "Recipient_Contact Name": order.get("customer_name", ""),
             "Recipient_Company Name": shipping.get("company_name", ""),
@@ -57,13 +60,17 @@ def generate_excel(order_numbers: List[str] = Query(...)):
         "Recipient_Email", "Reference_1", "Invoice Value"
     ]
     df = pd.DataFrame(records, columns=columns)
+
+    # Create in-memory Excel file
+    excel_io = BytesIO()
+    df.to_excel(excel_io, index=False)
+    excel_io.seek(0)
+
     safe_names = "_".join([urllib.parse.quote(num) for num in order_numbers])
-    file_path = f"/tmp/orders_{safe_names}.xlsx"
-    df.to_excel(file_path, index=False)
+    filename = f"SalesOrders_{safe_names}.xlsx"
 
-    return FileResponse(
-        path=file_path,
-        filename=f"SalesOrders_{safe_names}.xlsx",
-        media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    return StreamingResponse(
+        excel_io,
+        media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
     )
-
