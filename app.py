@@ -8,13 +8,13 @@ app = Flask(__name__)
 def fetch_orders():
     try:
         data = request.get_json()
-        order_ids = data.get("order_ids", [])
-        if not order_ids:
-            return jsonify({"error": "No order_ids provided"}), 400
+        order_nos = data.get("order_no", [])
+        if not order_nos:
+            return jsonify({"error": "No order_no values provided"}), 400
 
-        # Call the fetcher script
+        # Call the fetcher script with order_nos
         result = subprocess.run(
-            ['python', 'katana_order_fetcher.py', json.dumps(order_ids)],
+            ['python', 'katana_order_fetcher.py', json.dumps(order_nos)],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True
@@ -23,7 +23,11 @@ def fetch_orders():
         try:
             response = json.loads(result.stdout)
         except json.JSONDecodeError:
-            response = {"status": "error", "message": "Script output not JSON", "details": result.stdout}
+            response = {
+                "status": "error",
+                "message": "Script output not JSON",
+                "details": result.stdout
+            }
 
         return jsonify(response)
 
