@@ -9,7 +9,8 @@ from typing import List
 
 app = FastAPI()
 
-KATANA_API_TOKEN = os.environ.get("KATANA_API_TOKEN", "4103d451-7217-42fa-9cca-0f8a9e70155e")
+# Security: Use environment variable, or fallback to your token (for dev only)
+KATANA_API_TOKEN = os.environ.get("KATANA_API_TOKEN", "1e2c6dd2-c8ed-490d-8c70-a4bb21152682")
 KATANA_API_BASE = "https://api.katanamrp.com/v1"
 KATANA_SALES_ORDERS_URL = f"{KATANA_API_BASE}/sales_orders"
 
@@ -19,8 +20,7 @@ def fetch_all_sales_orders():
     url = KATANA_SALES_ORDERS_URL
     while url:
         response = requests.get(url, headers=headers)
-        # Added debug log for Render logs!
-        print(f"Fetching {url} - Status {response.status_code} - Text: {response.text}")
+        print(f"Fetching {url} - Status {response.status_code} - Text: {response.text}")  # Debug for logs!
         if response.status_code != 200:
             raise HTTPException(
                 status_code=500,
@@ -42,6 +42,7 @@ def generate_excel(order_numbers: List[str] = Query(...)):
     for order in selected_orders:
         shipping = order.get("shipping_address", {}) or {}
         records.append({
+            "Order ID": order.get("id", ""),
             "Recipient_Contact Name": order.get("customer_name", ""),
             "Recipient_Company Name": shipping.get("company_name", ""),
             "Recipient_Address Line 1": shipping.get("address_line1", ""),
@@ -58,6 +59,7 @@ def generate_excel(order_numbers: List[str] = Query(...)):
         })
 
     columns = [
+        "Order ID",
         "Recipient_Contact Name", "Recipient_Company Name", "Recipient_Address Line 1",
         "Recipient_Address Line 2", "Recipient_Address Line 3", "Recipient_Country",
         "Recipient_City", "Recipient_State", "Recipient_Postal code", "Recipient_Phone Number",
