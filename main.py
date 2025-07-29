@@ -9,7 +9,6 @@ from typing import List
 
 app = FastAPI()
 
-# Use env variable for security; fallback for local/dev only
 KATANA_API_TOKEN = os.environ.get("KATANA_API_TOKEN", "4103d451-7217-42fa-9cca-0f8a9e70155e")
 KATANA_API_BASE = "https://api.katanamrp.com/v1"
 KATANA_SALES_ORDERS_URL = f"{KATANA_API_BASE}/sales_orders"
@@ -20,8 +19,13 @@ def fetch_all_sales_orders():
     url = KATANA_SALES_ORDERS_URL
     while url:
         response = requests.get(url, headers=headers)
+        # Added debug log for Render logs!
+        print(f"Fetching {url} - Status {response.status_code} - Text: {response.text}")
         if response.status_code != 200:
-            raise HTTPException(status_code=500, detail="Failed to fetch sales orders from Katana")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to fetch sales orders from Katana: {response.status_code} - {response.text}"
+            )
         data = response.json()
         results.extend(data.get("results", []))
         url = data.get("next")
